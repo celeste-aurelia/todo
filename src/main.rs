@@ -1,3 +1,4 @@
+use std::io;
 use std::env;
 use std::fmt;
 use strum_macros::EnumString;
@@ -50,38 +51,88 @@ fn main() {
     match method {
         "-i" | "--init" => {
             let query = "create table if not exists tasks (title text not null, status text check(status in ('TODO', 'DOING', 'DONE')), description text);";
-            let result = connection.execute(query, []).expect("init db");
-            println!("{:?}", result);
+            match connection.execute(query, []) {
+                Ok(_) => println!("Initialized database"),
+                Err(_) => println!("Could not initialize database")
+            };
         },
         "-r" | "--reset" => {
-            let query = "drop table if exists tasks";
-            let result = connection.execute(query, []).expect("reset db");
-            println!("{:?}", result);
+            println!("Are you sure you want to reset the database? (y|N)");
+            let input = &mut String::new();
+            io::stdin().read_line(input).expect("failed to read input");
+            match input.trim() {
+                "y" | "yes" => {
+                    let query = "drop table tasks;";
+                    match connection.execute(query, []) {
+                        Ok(_) => println!("Reset database"),
+                        Err(_) => println!("Could not reset database")
+                    };
+                },
+                _ => println!("Process cancelled"),
+            };
         },
         "-a" | "--add" => {
-            let result = connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3)", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]).expect("add task");
-            println!("{:?}", result);
+            if arguments.len() == 2 {
+                match connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3);", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]) {
+                    Ok(result) => {
+                        if result == 1 {
+                            println!("Added task");
+                        }else {
+                            println!("Could not add task");
+                        }
+                    }, 
+                    Err(_) => println!("Could not add task.\n-a, --add 'title' 'description'")
+                };    
+            }else {
+                println!("Invalid arguments.\nFormat must be: -a, --add 'title' 'description'");
+            }
         },
         "-l" | "--list" => {
             let mut stmt = connection.prepare("SELECT rowid, * FROM tasks;").expect("list tasks");
-    
-            let tasks = stmt.query_map([], |row| {
+            
+            match stmt.query_map([], |row| {
                 Ok(Task {
                     id: row.get("rowid")?,
                     title: row.get("title")?,
                     description: row.get("description")?,
                     status: Status::from_str(&row.get::<&str, String>("status")?).expect("parse db row to Status enum")
                 })
-            }).expect("map db rows to Task struct");
-            println!("{:?}", tasks.collect::<Vec<_>>()); 
+            }) {
+                Ok(tasks) => println!("{:?}", tasks.collect::<Vec<_>>()), 
+                Err(_) => println!("Could not list tasks. \n -l, --list")
+            };
         },
         "-u" | "--update" => {
-            let result = connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]).expect("update task");
-            println!("{:?}", result);
+            if arguments.len() == 4 {
+                match connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1;", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]) {
+                    Ok(result) => {
+                        if result == 1 {
+                            println!("Updated task with id = {}", &arguments[0]);
+                        }else {
+                            println!("Could not find or update task with id = {}", &arguments[0]);
+                        }
+                    }, 
+                    Err(_) => println!("Could not update task.\n -u, --update 'id' 'title' 'description'")
+                };  
+            }else {
+                println!("Invalid arguments.\nFormat must be: -u, --update 'id' 'title' 'description'");
+            }
         },
         "-d" | "--delete" => {
-            let result = connection.execute("DELETE FROM tasks WHERE rowid == ?1", params![&arguments[0]]).expect("delete task");
-            println!("{:?}", result); 
+            if arguments.len() == 1 {
+                match connection.execute("DELETE FROM tasks WHERE rowid == ?1;", params![&arguments[0]]) {
+                    Ok(result) => {
+                        if result == 1 {
+                            println!("Deleted task with id = {}", &arguments[0]);
+                        }else {
+                            println!("Could not find or delete task with id = {}", &arguments[0]);
+                        }
+                    }, 
+                    Err(_) => println!("Could not delete task.\n -d, --delete 'id'")
+                };
+            }else{  
+                println!("Invalid arguments.\nFormat must be: -d, --delete 'id'");
+            }
         },
         "-v" | "--version" => {
             println!("ToDo {:?}", VERSION)
