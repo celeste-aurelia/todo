@@ -63,14 +63,18 @@ fn main() {
             };
         },
         "-a" | "--add" => {
-            match connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3)", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]) {
-                Ok(result) => println!("{:?}", result), 
-                Err(e) => println!("Could not add task. \n -a, --add 'title' 'description'")
-            };
+            if arguments.len() == 2 {
+                match connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3)", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]) {
+                    Ok(result) => println!("{:?}", result), 
+                    Err(e) => println!("Could not add task.\n-a, --add 'title' 'description'")
+                };    
+            }else {
+                println!("Invalid arguments.\nFormat must be: -a, --add 'title' 'description'");
+            }
         },
         "-l" | "--list" => {
             let mut stmt = connection.prepare("SELECT rowid, * FROM tasks;").expect("list tasks");
-    
+            
             match stmt.query_map([], |row| {
                 Ok(Task {
                     id: row.get("rowid")?,
@@ -84,16 +88,24 @@ fn main() {
             };
         },
         "-u" | "--update" => {
-            match connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]) {
-                Ok(result) => println!("{:?}", result), 
-                Err(e) => println!("Could not update task. \n -u, --update 'id' 'title' 'description'")
-            };
+            if arguments.len() == 4 {
+                match connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]) {
+                    Ok(result) => println!("{:?}", result), 
+                    Err(e) => println!("Could not update task.\n -u, --update 'id' 'title' 'description'")
+                };  
+            }else {
+                println!("Invalid arguments.\nFormat must be: -u, --update 'id' 'title' 'description'");
+            }
         },
         "-d" | "--delete" => {
-            match connection.execute("DELETE FROM tasks WHERE rowid == ?1", params![&arguments[0]]) {
-                Ok(result) => println!("{:?}", result), 
-                Err(e) => println!("Could not delete task. \n -d, --delete 'id'")
-            };
+            if arguments.len() == 1 {
+                match connection.execute("DELETE FROM tasks WHERE rowid == ?1", params![&arguments[0]]) {
+                    Ok(result) => println!("{:?}", result), 
+                    Err(e) => println!("Could not delete task.\n -d, --delete 'id'")
+                };
+            }else{  
+                println!("Invalid arguments.\nFormat must be: -d, --delete 'id'");
+            }
         },
         "-v" | "--version" => {
             println!("ToDo {:?}", VERSION)
