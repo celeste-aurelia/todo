@@ -50,38 +50,50 @@ fn main() {
     match method {
         "-i" | "--init" => {
             let query = "create table if not exists tasks (title text not null, status text check(status in ('TODO', 'DOING', 'DONE')), description text);";
-            let result = connection.execute(query, []).expect("init db");
-            println!("{:?}", result);
+            match connection.execute(query, []) {
+                Ok(result) => println!("{:?}", result), 
+                Err(e) => println!("Could not initialize database")
+            };
         },
         "-r" | "--reset" => {
             let query = "drop table if exists tasks";
-            let result = connection.execute(query, []).expect("reset db");
-            println!("{:?}", result);
+            match connection.execute(query, []) {
+                Ok(result) => println!("{:?}", result), 
+                Err(e) => println!("Could not reset database")
+            };
         },
         "-a" | "--add" => {
-            let result = connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3)", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]).expect("add task");
-            println!("{:?}", result);
+            match connection.execute("INSERT INTO tasks (title, status, description) values (?1, ?2, ?3)", params![&arguments[0], Status::TODO.to_string(), &arguments[1]]) {
+                Ok(result) => println!("{:?}", result), 
+                Err(e) => println!("Could not add task. \n -a, --add 'title' 'description'")
+            };
         },
         "-l" | "--list" => {
             let mut stmt = connection.prepare("SELECT rowid, * FROM tasks;").expect("list tasks");
     
-            let tasks = stmt.query_map([], |row| {
+            match stmt.query_map([], |row| {
                 Ok(Task {
                     id: row.get("rowid")?,
                     title: row.get("title")?,
                     description: row.get("description")?,
                     status: Status::from_str(&row.get::<&str, String>("status")?).expect("parse db row to Status enum")
                 })
-            }).expect("map db rows to Task struct");
-            println!("{:?}", tasks.collect::<Vec<_>>()); 
+            }) {
+                Ok(tasks) => println!("{:?}", tasks.collect::<Vec<_>>()), 
+                Err(e) => println!("Could not list tasks. \n -l, --list")
+            };
         },
         "-u" | "--update" => {
-            let result = connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]).expect("update task");
-            println!("{:?}", result);
+            match connection.execute("UPDATE tasks SET title = ?2, status = ?3, description = ?4 WHERE rowid == ?1", params![&arguments[0], &arguments[1], &arguments[2], &arguments[3]]) {
+                Ok(result) => println!("{:?}", result), 
+                Err(e) => println!("Could not update task. \n -u, --update 'id' 'title' 'description'")
+            };
         },
         "-d" | "--delete" => {
-            let result = connection.execute("DELETE FROM tasks WHERE rowid == ?1", params![&arguments[0]]).expect("delete task");
-            println!("{:?}", result); 
+            match connection.execute("DELETE FROM tasks WHERE rowid == ?1", params![&arguments[0]]) {
+                Ok(result) => println!("{:?}", result), 
+                Err(e) => println!("Could not delete task. \n -d, --delete 'id'")
+            };
         },
         "-v" | "--version" => {
             println!("ToDo {:?}", VERSION)
